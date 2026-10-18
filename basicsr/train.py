@@ -1,6 +1,3 @@
-import sys
-sys.path.append('/lxy/BasicSR')
-
 import datetime
 import logging
 import math

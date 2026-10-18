@@ -1,6 +1,3 @@
-import sys
-sys.path.append('/lxy/BasicSR')
-
 import logging
 import torch
 from os import path as osp

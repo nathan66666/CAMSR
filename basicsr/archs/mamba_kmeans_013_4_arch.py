@@ -148,7 +148,7 @@ class TAB(nn.Module):
     def __init__(self, dim, mlp_dim, n_iter=3,
                  num_tokens=8,
                  ema_decay=0.999,
-                 record_stats=True):  # 新增参数
+                 record_stats=False):  # 新增参数
         super().__init__()
 
         self.n_iter = n_iter
@@ -237,7 +237,8 @@ class TAB(nn.Module):
         # 修复：只在训练模式下记录
         if self.record_stats and self.training:
             self.record_cluster_distribution(x)
-        self.plot_statistics()
+        if self.record_stats and self.training:
+            self.plot_statistics()
                 
         return cls_policy, idx, sorted_x
     
