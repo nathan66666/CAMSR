@@ -1,5 +1,4 @@
 import functools
-import torch
 from torch.nn import functional as F
 
 
@@ -14,7 +13,7 @@ def reduce_loss(loss, reduction):
         Tensor: Reduced loss tensor.
     """
     reduction_enum = F._Reduction.get_enum(reduction)
-    # none: 0, elementwise_mean:1, sum: 2
+
     if reduction_enum == 0:
         return loss
     elif reduction_enum == 1:
@@ -23,7 +22,7 @@ def reduce_loss(loss, reduction):
         return loss.sum()
 
 
-def weight_reduce_loss(loss, weight=None, reduction='mean'):
+def weight_reduce_loss(loss, weight=None, reduction="mean"):
     """Apply element-wise weight and reduce loss.
 
     Args:
@@ -35,17 +34,16 @@ def weight_reduce_loss(loss, weight=None, reduction='mean'):
     Returns:
         Tensor: Loss values.
     """
-    # if weight is specified, apply element-wise weight
+
     if weight is not None:
         assert weight.dim() == loss.dim()
         assert weight.size(1) == 1 or weight.size(1) == loss.size(1)
         loss = loss * weight
 
-    # if weight is not specified or reduction is sum, just reduce the loss
-    if weight is None or reduction == 'sum':
+    if weight is None or reduction == "sum":
         loss = reduce_loss(loss, reduction)
-    # if reduction is mean, then compute mean over weight region
-    elif reduction == 'mean':
+
+    elif reduction == "mean":
         if weight.size(1) > 1:
             weight = weight.sum()
         else:
@@ -87,59 +85,10 @@ def weighted_loss(loss_func):
     """
 
     @functools.wraps(loss_func)
-    def wrapper(pred, target, weight=None, reduction='mean', **kwargs):
-        # get element-wise loss
+    def wrapper(pred, target, weight=None, reduction="mean", **kwargs):
+
         loss = loss_func(pred, target, **kwargs)
         loss = weight_reduce_loss(loss, weight, reduction)
         return loss
 
     return wrapper
-
-
-def get_local_weights(residual, ksize):
-    """Get local weights for generating the artifact map of LDL.
-
-    It is only called by the `get_refined_artifact_map` function.
-
-    Args:
-        residual (Tensor): Residual between predicted and ground truth images.
-        ksize (Int): size of the local window.
-
-    Returns:
-        Tensor: weight for each pixel to be discriminated as an artifact pixel
-    """
-
-    pad = (ksize - 1) // 2
-    residual_pad = F.pad(residual, pad=[pad, pad, pad, pad], mode='reflect')
-
-    unfolded_residual = residual_pad.unfold(2, ksize, 1).unfold(3, ksize, 1)
-    pixel_level_weight = torch.var(unfolded_residual, dim=(-1, -2), unbiased=True, keepdim=True).squeeze(-1).squeeze(-1)
-
-    return pixel_level_weight
-
-
-def get_refined_artifact_map(img_gt, img_output, img_ema, ksize):
-    """Calculate the artifact map of LDL
-    (Details or Artifacts: A Locally Discriminative Learning Approach to Realistic Image Super-Resolution. In CVPR 2022)
-
-    Args:
-        img_gt (Tensor): ground truth images.
-        img_output (Tensor): output images given by the optimizing model.
-        img_ema (Tensor): output images given by the ema model.
-        ksize (Int): size of the local window.
-
-    Returns:
-        overall_weight: weight for each pixel to be discriminated as an artifact pixel
-        (calculated based on both local and global observations).
-    """
-
-    residual_ema = torch.sum(torch.abs(img_gt - img_ema), 1, keepdim=True)
-    residual_sr = torch.sum(torch.abs(img_gt - img_output), 1, keepdim=True)
-
-    patch_level_weight = torch.var(residual_sr.clone(), dim=(-1, -2, -3), keepdim=True)**(1 / 5)
-    pixel_level_weight = get_local_weights(residual_sr.clone(), ksize)
-    overall_weight = patch_level_weight * pixel_level_weight
-
-    overall_weight[residual_sr < residual_ema] = 0
-
-    return overall_weight

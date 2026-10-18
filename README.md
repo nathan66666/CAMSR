@@ -1,66 +1,82 @@
 # CAMSR
 
-CAMSR: Content-Aware State Space Model for Lightweight Image Super-Resolution。
-本精简版以 `options/train/mamba_kmeans_013_4_4_pre_l1_1.yml` 为基准，保留 x4 训练与成对图像测试。
+Official implementation of **CAMSR: Content-Aware State Space Model for Lightweight Image Super-Resolution**.
 
-## 环境
+## Installation
 
-需要 NVIDIA GPU、兼容的 CUDA/PyTorch，以及 `mamba-ssm` 的 selective-scan CUDA 扩展。
-建议使用独立 Python 虚拟环境，先按 PyTorch 官方说明安装与 CUDA 匹配的 torch 和 torchvision，再安装：
+Use a Python virtual environment with an NVIDIA GPU and a compatible CUDA/PyTorch installation. Install the matching `torch` and `torchvision` builds following the [PyTorch instructions](https://pytorch.org/get-started/locally/), then run:
 
 ```bash
 python -m pip install packaging ninja
 python -m pip install -r requirements.txt --no-build-isolation
 python -m pip install -e . --no-deps --no-build-isolation
-python -c "import torch; from mamba_ssm.ops.selective_scan_interface import selective_scan_fn; assert torch.cuda.is_available(); print('CUDA and selective scan available')"
+python -c "import torch; from mamba_ssm.ops.selective_scan_interface import selective_scan_fn; assert torch.cuda.is_available()"
 ```
 
-原仓库未锁定版本；请以实际 GPU/CUDA 的兼容组合为准。CPU 不支持本模型的 selective-scan 训练/推理。
-不再需要 BasicSR 的 DCN、fused_act 或 upfirdn2d 扩展。
+The model uses the `mamba-ssm` selective-scan CUDA extension. Production training and inference require CUDA; installing CPU-only PyTorch is insufficient. The dependencies are not version-locked; choose a compatible Python, PyTorch, CUDA and `mamba-ssm` combination.
 
-## 数据与训练
+The Python package remains under `basicsr/` to retain the BasicSR training framework. The network and training wrapper are `CAMSR` and `CAMSRModel`.
 
-在仓库根目录执行。训练 YAML 保留原实验参数及路径，运行前必须修改以下本机路径：
+## Data preparation
 
-- `datasets.train.dataroot_gt`：DF2K HR 子图。
-- `datasets.train.dataroot_lq`：对应的 x4 LR 子图。
-- `datasets.train.meta_info_file`：HR 文件名列表；每行首项为图像文件名。
-- `datasets.val_1` / `val_2` 的 HR、LR 路径：Set5、Set14。
+Run commands from the repository root. Prepare paired LR/HR images and edit the dataset paths in both YAML files. The default layout is:
 
-LR/HR 文件名通过 `filename_tmpl: '{}'` 匹配，HR 尺寸应是 LR 的 4 倍。
-原配置使用 batch size 32、HR crop 320；显存不足时自行降低 batch size。
+```text
+datasets/
+├── DF2K/
+│   ├── DF2K_HR_sub/
+│   ├── X4_sub/
+│   └── DF2Ksub_GT.txt
+├── Set5/
+│   ├── GTmod12/
+│   └── LRbicx4/
+└── Set14/
+    ├── GTmod12/
+    └── LRbicx4/
+```
+
+Use `io_backend.type: disk`. LR and HR filenames must match (`filename_tmpl: '{}'`), and each HR image must be four times the LR size. Each line of the training metadata file starts with an HR filename, optionally followed by image shape metadata.
+
+## Training
 
 ```bash
-python -m basicsr.train -opt options/train/mamba_kmeans_013_4_4_pre_l1_1.yml
-# 恢复训练（需要已有训练状态）：
-python -m basicsr.train -opt options/train/mamba_kmeans_013_4_4_pre_l1_1.yml --auto_resume
-# 多卡：
-bash scripts/dist_train.sh 2 options/train/mamba_kmeans_013_4_4_pre_l1_1.yml
+python -m basicsr.train -opt options/train/train_CAMSR_x4.yml
 ```
 
-权重、训练状态和日志输出到 `experiments/<实验名称>/`。TensorBoard：
-`tensorboard --logdir tb_logger`。
+The configuration retains the supplied experiment's network dimensions, L1 loss, optimizer, schedule and augmentation settings: x4 SR, batch size 32 and HR crop size 320. Reduce batch size if necessary for available GPU memory.
 
-## 测试
-
-`options/test/mamba_kmeans_013_4_x4.yml` 与训练配置使用相同网络结构、x4 倍率和 PSNR/SSIM 指标。
-修改测试集 HR/LR 路径和 `path.pretrain_network_g` 为实际文件；默认指向训练生成的 `net_g_latest.pth`，优先读取 EMA 参数 `params_ema`。
+Resume an existing run:
 
 ```bash
-python -m basicsr.test -opt options/test/mamba_kmeans_013_4_x4.yml
+python -m basicsr.train -opt options/train/train_CAMSR_x4.yml --auto_resume
 ```
 
-测试结果写入 `results/<实验名称>/`；PSNR/SSIM 均采用 Y 通道并裁去 4 像素边界。
+Multi-GPU training:
 
-## 精简范围
+```bash
+bash scripts/dist_train.sh 2 options/train/train_CAMSR_x4.yml
+```
 
-保留模型、VimIR/SR 训练封装、Adam/调度器/EMA/检查点、成对数据加载与增强、L1 损失、PSNR/SSIM、日志、分布式入口、安装文件及原许可。
-删除其他实验 YAML、其他数据集与损失、NIQE/LPIPS/FID、无关 CUDA 算子、模型转换、旧文档、绘图/分析脚本、CSV/PDF 和重复工具。
-模型的聚类统计绘图默认关闭，避免每次前向都写入原机器的 `/data5/CAMSR/cluster_stats.png`；网络计算及权重结构保持不变。
+Checkpoints and training states are saved under `experiments/CAMSR_x4_train/`. View logs with `tensorboard --logdir tb_logger`.
 
-本次云机器未提供 GPU、CUDA、数据集或检查点，因此完整训练、断点恢复和测试指标仍需在具备这些资源的机器验证。
+## Testing
 
-## 致谢与许可
+Set `path.pretrain_network_g` and the test dataset paths in `options/test/test_CAMSR_x4.yml`, then run:
 
-基于 [BasicSR](https://github.com/xinntao/BasicSR)。保留 `LICENSE.txt`、`LICENSE/` 与 `CITATION.cff`。
-联系：`xyan_lei@163.com`。
+```bash
+python -m basicsr.test -opt options/test/test_CAMSR_x4.yml
+```
+
+The default checkpoint is `experiments/CAMSR_x4_train/models/net_g_latest.pth`. Testing loads EMA weights (`params_ema`) when available and falls back to `params`. Results are saved under `results/CAMSR_x4_test/`. PSNR and SSIM use the Y channel with a four-pixel border crop.
+
+## Existing checkpoints
+
+Network parameter names and tensor shapes are preserved, so existing `params` / `params_ema` state dictionaries can be loaded with `strict_load_g: true`. YAML files should now use `network_g.type: CAMSR` and `model_type: CAMSRModel`.
+
+For automatic resume from an older experiment directory, retain its experiment name via `--force_yml name=<existing_experiment_name>`, together with `--auto_resume`. Keep the corresponding model checkpoints and training states in that experiment directory.
+
+## Acknowledgements
+
+The training framework is based on [BasicSR](https://github.com/xinntao/BasicSR). Upstream licenses and attribution are retained in `LICENSE.txt` and `LICENSE/`; the BasicSR citation is in `LICENSE/BasicSR.cff`.
+
+Contact: `xyan_lei@163.com`.

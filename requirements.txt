@@ -8,5 +8,4 @@ torchvision
 tqdm
 timm
 einops
-matplotlib
 mamba-ssm

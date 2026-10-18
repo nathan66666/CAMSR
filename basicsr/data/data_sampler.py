@@ -27,7 +27,7 @@ class EnlargedSampler(Sampler):
         self.total_size = self.num_samples * self.num_replicas
 
     def __iter__(self):
-        # deterministically shuffle based on epoch
+
         g = torch.Generator()
         g.manual_seed(self.epoch)
         indices = torch.randperm(self.total_size, generator=g).tolist()
@@ -35,8 +35,7 @@ class EnlargedSampler(Sampler):
         dataset_size = len(self.dataset)
         indices = [v % dataset_size for v in indices]
 
-        # subsample
-        indices = indices[self.rank:self.total_size:self.num_replicas]
+        indices = indices[self.rank : self.total_size : self.num_replicas]
         assert len(indices) == self.num_samples
 
         return iter(indices)

@@ -1,10 +1,10 @@
-name: mamba_kmeans_013_4_x4_test
-model_type: VimIRModel
+name: CAMSR_x4_test
+model_type: CAMSRModel
 scale: 4
 num_gpu: 1
 manual_seed: 0
 network_g:
-  type: mamba_kmeans_013_4
+  type: CAMSR
   img_size: 80
   patch_size: 1
   embed_dim: 60
@@ -17,13 +17,6 @@ network_g:
   - 1
   - 1
   - 1
-  rms_norm: false
-  residual_in_fp32: true
-  fused_add_norm: false
-  if_abs_pos_embed: false
-  if_rope: false
-  if_rope_residual: true
-  if_cls_token: false
   upscale: 4
   upsampler: pixelshuffledirect
   resi_connection: 3conv
@@ -31,19 +24,19 @@ datasets:
   test_1:
     name: Set5
     type: PairedImageDataset
-    dataroot_gt: /lxy/lxy/test_dataset/Set5/GTmod12
-    dataroot_lq: /lxy/lxy/test_dataset/Set5/LRbicx4
+    dataroot_gt: datasets/Set5/GTmod12
+    dataroot_lq: datasets/Set5/LRbicx4
     io_backend:
       type: disk
   test_2:
     name: Set14
     type: PairedImageDataset
-    dataroot_gt: /lxy/lxy/test_dataset/Set14/GTmod12
-    dataroot_lq: /lxy/lxy/test_dataset/Set14/LRbicx4
+    dataroot_gt: datasets/Set14/GTmod12
+    dataroot_lq: datasets/Set14/LRbicx4
     io_backend:
       type: disk
 path:
-  pretrain_network_g: experiments/mamba_kmeans_013_4_4_pre_l1_1_train/models/net_g_latest.pth
+  pretrain_network_g: experiments/CAMSR_x4_train/models/net_g_latest.pth
   param_key_g: params_ema
   strict_load_g: true
 val:
