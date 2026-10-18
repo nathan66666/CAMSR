@@ -1,0 +1,105 @@
+# general settings
+name: CATANet_s
+model_type: VimIRModel
+scale: 4
+num_gpu: 1
+manual_seed: 0
+
+#  3,651,159
+
+# dataset and data loader settings
+datasets:
+ 
+
+  test_1:
+    name: Set5
+    type: PairedImageDataset
+    dataroot_gt: /lxy/lxy/test_dataset/Set5/original_GT
+    dataroot_lq: /lxy/lxy/test_dataset/Set5/original_bicx4
+    io_backend:
+      type: disk
+      
+  test_2:
+    name: Set14
+    type: PairedImageDataset
+    dataroot_gt: /lxy/lxy/test_dataset/Set14/GTmod12
+    dataroot_lq: /lxy/lxy/test_dataset/Set14/LRbicx4
+    io_backend:
+      type: disk
+
+  test_3:
+    name: BSD100
+    type: PairedImageDataset
+    dataroot_gt: /lxy/lxy/test_dataset/BSD100/BSDS100_GT
+    dataroot_lq: /lxy/lxy/test_dataset/BSD100/BSDS100_bicx4
+    io_backend:
+      type: disk
+
+  test_4:
+    name: urban100
+    type: PairedImageDataset
+    dataroot_gt: /lxy/lxy/test_dataset/urban100/urban100_GT
+    dataroot_lq: /lxy/lxy/test_dataset/urban100/urban100_bicx4
+    io_backend:
+      type: disk
+
+  test_5:
+    name: manga109
+    type: PairedImageDataset
+    dataroot_gt: /lxy/lxy/test_dataset/manga109/manga109_GT
+    dataroot_lq: /lxy/lxy/test_dataset/manga109/manga109_bicx4
+    io_backend:
+      type: disk
+
+  test_6:
+    name: realsr_canon
+    type: PairedImageDataset
+    dataroot_gt: /data5/lxy/DASR/datasets/datasets/RealSR/Canon/HR
+    dataroot_lq: /data5/lxy/DASR/datasets/datasets/RealSR/Canon/LRbicx4
+    io_backend:
+      type: disk
+
+  test_7:
+    name: realsr_nikon
+    type: PairedImageDataset
+    dataroot_gt: /data5/lxy/DASR/datasets/datasets/RealSR/Nikon/HR
+    dataroot_lq: /data5/lxy/DASR/datasets/datasets/RealSR/Nikon/LRbicx4
+    io_backend:
+      type: disk
+
+# network structures
+network_g:
+  type: CATANet_s
+  upscale: 4
+
+
+# path
+path:
+  pretrain_network_g: /data5/CAMSR/experiments/train_CATANet_s_x4/models/net_g_latest.pth
+  strict_load_g: true
+  resume_state: ~
+
+
+# validation settings
+val:
+  # val_freq: !!float 5e3
+  save_img: true
+  suffix: ~
+
+  metrics:
+    psnr: # metric name, can be arbitrary
+      type: calculate_psnr
+      crop_border: 4
+      test_y_channel: true
+
+    ssim: # metric name, can be arbitrary
+      type: calculate_ssim
+      crop_border: 4
+      test_y_channel: true
+
+    lpips: # metric name, can be arbitrary
+      type: calculate_lpips
+      crop_border: 4
+      test_y_channel: true
+
+# PYTHONPATH="./:${PYTHONPATH}" CUDA_VISIBLE_DEVICES=4 python basicsr/test.py -opt /data5/CAMSR/options/test/motivation_1.yml

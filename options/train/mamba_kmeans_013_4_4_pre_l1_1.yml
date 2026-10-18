@@ -1,0 +1,132 @@
+# general settings
+name: mamba_kmeans_013_4_4_pre_l1_1_train
+model_type: VimIRModel
+scale: 4
+num_gpu: 1
+manual_seed: 0
+
+# dataset and data loader settings
+datasets:
+  train:
+    name: DF2K
+    type: PairedImageDataset
+    dataroot_gt: /data5/DF2K/DF2K_HR_sub
+    dataroot_lq: /data5/DF2K/X4_sub
+    meta_info_file: /data5/DF2K/DF2Ksub_GT.txt
+    filename_tmpl: '{}'
+    io_backend:
+      type: disk
+
+    gt_size: 320
+    use_hflip: true
+    use_rot: true
+
+    # data loader
+    num_worker_per_gpu: 6
+    batch_size_per_gpu: 32
+    dataset_enlarge_ratio: 1
+    prefetch_mode: ~
+
+  val_1:
+    name: Set5
+    type: PairedImageDataset
+    dataroot_gt: /lxy/lxy/test_dataset/Set5/GTmod12
+    dataroot_lq: /lxy/lxy/test_dataset/Set5/LRbicx4
+    io_backend:
+      type: disk
+      
+  val_2:
+    name: Set14
+    type: PairedImageDataset
+    dataroot_gt: /lxy/lxy/test_dataset/Set14/GTmod12
+    dataroot_lq: /lxy/lxy/test_dataset/Set14/LRbicx4
+    io_backend:
+      type: disk
+
+# network structures
+network_g:
+  type: mamba_kmeans_013_4
+  img_size: 80
+  patch_size: 1
+  embed_dim: 60
+  inner_rank: 32
+  num_tokens: 64
+  depths: [1,1,1,1,1,1]
+  rms_norm: False
+  residual_in_fp32: True
+  fused_add_norm: False
+  if_abs_pos_embed: False
+  if_rope: False
+  if_rope_residual: True
+  if_cls_token: False
+  upscale: 4
+  upsampler: "pixelshuffledirect" 
+  resi_connection: '3conv'
+
+# /lxy/DVMSR/experiments/mamba_kmeans_013_4_4_pre_l1_train/models/net_g_390000.pth
+# path
+path:
+  pretrain_network_g: ~
+  strict_load_g: true
+  resume_state: ~
+
+# training settings
+train:
+  ema_decay: 0.999
+  optim_g:
+    type: Adam
+    lr: !!float 2e-4
+    weight_decay: 0
+    betas: [0.9, 0.99]
+
+  scheduler:
+    type: MultiStepLR
+    milestones: [250000, 400000, 450000, 475000]
+    gamma: 0.5
+
+  total_iter: 1000000
+  warmup_iter: -1  # no warm up
+
+  # losses
+  pixel_opt:
+    type: L1Loss
+    loss_weight: 1.0
+    reduction: mean
+
+# validation settings
+val:
+  val_freq: !!float 5e3
+  save_img: false
+
+  metrics:
+    psnr: # metric name, can be arbitrary
+      type: calculate_psnr
+      crop_border: 4
+      test_y_channel: true
+
+    ssim: # metric name, can be arbitrary
+      type: calculate_ssim
+      crop_border: 4
+      test_y_channel: true
+
+# logging settings
+logger:
+  print_freq: 100
+  save_checkpoint_freq: !!float 200
+  use_tb_logger: true
+  wandb:
+    project: ~
+    resume_id: ~
+
+# dist training settings
+dist_params:
+  backend: nccl
+  port: 29500
+
+# CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 \
+# torchrun --nproc_per_node=8 --master_port=4321 basicsr/train.py -opt options/train/train_VimIR_SRx4_scratch.yml --launcher pytorch
+
+# CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 \
+# python -m torch.distributed.launch --nproc_per_node=8 --master_port=4321 --use_env basicsr/train.py -opt /lxy/BasicSR/options/train/VimIR/001_train_VimIR_SRx4_scratch_DIV2K.yml --launcher pytorch
+
+# PYTHONPATH="./:${PYTHONPATH}" CUDA_VISIBLE_DEVICES=6 python basicsr/train.py -opt /data5/CAMSR/options/train/mamba_kmeans_013_4_4_pre_l1_1.yml --auto_resume

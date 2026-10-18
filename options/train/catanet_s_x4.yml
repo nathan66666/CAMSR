@@ -1,0 +1,110 @@
+# general settings for image SR training
+name: train_CATANet_s_x4
+model_type: CATANetModel
+scale: 4
+num_gpu: auto
+manual_seed: 3407
+# dataset and data loader settings
+datasets:
+  train:
+    name: DF2K
+    type: PairedImageDataset
+    dataroot_gt: /data5/DF2K/DF2K_HR_sub
+    dataroot_lq: /data5/DF2K/X4_sub
+    meta_info_file: /data5/DF2K/DF2Ksub_GT.txt
+    filename_tmpl: '{}'
+    io_backend:
+      type: disk
+
+    gt_size: 256
+    use_hflip: true
+    use_rot: true
+
+    # data loader
+    num_worker_per_gpu: 6
+    batch_size_per_gpu: 16
+    dataset_enlarge_ratio: 1
+    prefetch_mode: ~
+
+  val_1:
+    name: Set5
+    type: PairedImageDataset
+    dataroot_gt: /lxy/lxy/test_dataset/Set5/GTmod12
+    dataroot_lq: /lxy/lxy/test_dataset/Set5/LRbicx4
+    io_backend:
+      type: disk
+      
+  val_2:
+    name: Set14
+    type: PairedImageDataset
+    dataroot_gt: /lxy/lxy/test_dataset/Set14/GTmod12
+    dataroot_lq: /lxy/lxy/test_dataset/Set14/LRbicx4
+    io_backend:
+      type: disk
+
+# network structures
+network_g:
+  type: CATANet_s
+  upscale: 4
+
+# path
+path:
+  pretrain_network_g: ~
+  strict_load_g: true
+  resume_state: ~
+
+# training settings
+train:
+  optim_g:
+    type: Adam
+    lr: !!float 2e-4
+    weight_decay: 0
+    betas: [0.9, 0.99]
+
+  scheduler:
+    type: MultiStepLR
+    milestones: [125000, 200000, 225000, 237500]
+    gamma: 0.5
+
+  total_iter: 250000
+
+
+  # losses
+  pixel_opt:
+    type: L1Loss
+    loss_weight: 1.0
+    reduction: mean
+# validation settings
+val:
+  val_freq: !!float 2500
+  save_img: false
+
+  metrics:
+    psnr: # metric name, can be arbitrary
+      type: calculate_psnr_pt
+      crop_border: 4
+      test_y_channel: true
+
+    ssim:
+      type: calculate_ssim_pt
+      crop_border: 4
+      test_y_channel: true
+
+
+
+# logging settings
+logger:
+  print_freq: 200
+  save_checkpoint_freq: !!float 2500
+  use_tb_logger: true
+  wandb:
+    project: ~
+    resume_id: ~
+
+# dist training settings
+dist_params:
+  backend: nccl
+  port: 29500
+
+
+# PYTHONPATH="./:${PYTHONPATH}" CUDA_VISIBLE_DEVICES=4 python basicsr/train.py -opt /data5/CAMSR/options/train/catanet_x4.yml
